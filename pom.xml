@@ -2,12 +2,12 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.mycompany</groupId>
-	<artifactId>testing-strategy</artifactId>
-	<version>1.0.0-SNAPSHOT</version>
+	<groupId>d7fd1f20-84ef-4f86-b3fb-bfcf5fe9645e</groupId>
+	<artifactId>cicd-app-andresc</artifactId>
+	<version>1.0.0</version>
 	<packaging>mule-application</packaging>
 
-	<name>testing-strategy</name>
+	<name>cicd-app-andresc</name>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -30,6 +30,40 @@
 				<artifactId>mule-maven-plugin</artifactId>
 				<version>${mule.maven.plugin.version}</version>
 				<extensions>true</extensions>
+				<configuration>
+					<cloudhub2Deployment>
+						<!-- URL of the control plane -->
+						<uri>https://anypoint.mulesoft.com</uri>
+						<!-- Inherited from the project metadata -->
+						<businessGroupId>${project.groupId}</businessGroupId>
+						<provider>MC</provider>
+						<environment>Sandbox</environment>
+						<!-- Target Name as in the documentation US East Ohio -->
+						<target>Cloudhub-US-East-2</target>
+						<!-- mule version format muleruntime-java17 -->
+						<!-- If not provided, will choose the latest Edge version -->
+						<!--<releaseChannel>EDGE</releaseChannel>-->
+						<muleVersion>4.9.8:6e-java17</muleVersion>
+						<!-- Authentication to do the deployment -->
+						<!-- Connected Apps, clientid and secret for CI Server -->
+						<!-- <connectedAppClientId>${ca_client_id}</connectedAppClientId>-->
+						<!-- <connectedAppClientSecret>${ca_client_secret}</connectedAppClientSecret>-->
+						<!-- <connectedAppGrantType>client_credentials</connectedAppGrantType>-->
+						<server>cloudhub-deploy</server>
+						<applicationName>${project.artifactId}</applicationName>
+						<replicas>1</replicas>
+						<vCores>0.1</vCores>
+						<deploymentSettings>
+							<http>
+								<inbound>
+									<!-- set to false because the mule app doesnt use HTTPS certificates 
+										internally -->
+									<lastMileSecurity>false</lastMileSecurity>
+								</inbound>
+							</http>
+						</deploymentSettings>
+					</cloudhub2Deployment>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>com.mulesoft.munit.tools</groupId>
