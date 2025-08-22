@@ -42,9 +42,52 @@ jobs:
       # maven build command, could add other flags if needed
       - name: Build
         run: mvn -B clean package --file pom.xml -DskipTests
+
+  munit:
+    needs: build
+    runs-on: ubuntu-latest
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+      
+      # Caches dependencies and build outputs to improve workflow execution time.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+            
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+
+      - uses: s4u/maven-settings-action@v2.6.0
+        with:
+          servers: |
+            [{
+                "id": "anypoint-exchange-v3",
+                "username": "${{ secrets.ANYPOINT_USERNAME }}",
+                "password": "${{ secrets.ANYPOINT_PASSWORD }}"
+            },
+            {
+              "id": "releases-ee",
+              "username": "${{ secrets.EXCHANGE_NEXUS_USERNAME }}",
+              "password": "${{ secrets.EXCHANGE_NEXUS_PASSWORD }}"
+            }
+            ]
+          
+      # maven build command, could add other flags if needed
+      - name: Munit Tests
+        run: mvn -B clean test --file pom.xml
         
   # This workflow contains a single job called "build"
   testing:
+    if: ${{ false }}
     needs: build
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
