@@ -41,7 +41,7 @@ jobs:
           
       # maven build command, could add other flags if needed
       - name: Build
-        run: mvn -B clean package --file pom.xml
+        run: mvn -B clean package --file pom.xml -DskipTests
         
   # This workflow contains a single job called "build"
   testing:
