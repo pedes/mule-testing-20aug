@@ -154,7 +154,7 @@ jobs:
       if: steps.check-artifact.outputs.exists == 'false'
       run: |
         echo "Publishing artifact to Exchange..."
-        mvn -B clean deploy --file pom.xml
+        mvn -B clean deploy --file pom.xml -DskipTests
         
     - name: Skip Exchange upload
       if: steps.check-artifact.outputs.exists == 'true'
@@ -195,7 +195,7 @@ jobs:
           ]
     - name: Deploy to CloudHub 2
       run: |
-        mvn clean deploy --file pom.xml -DmuleDeploy
+        mvn clean deploy --file pom.xml -DmuleDeploy -DskipTests
 
   # This workflow contains a single job called "build"
   testing:
