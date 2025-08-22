@@ -43,6 +43,7 @@ jobs:
       - name: Build
         run: mvn -B clean package --file pom.xml -DskipTests
 
+# This workflow contains a single job called "build"
   munit:
     needs: build
     runs-on: ubuntu-latest
@@ -84,7 +85,118 @@ jobs:
       # maven build command, could add other flags if needed
       - name: Munit Tests
         run: mvn -B clean test --file pom.xml
+
+
+# Step to upload the artifact to Exchange
+  exchange:
+    needs: munit
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-exists: ${{ steps.check-artifact.outputs.exists }}
+    steps:    
+    - uses: actions/checkout@v4
+    - uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+          
+    # Extract version from pom.xml
+    - name: Extract version
+      id: extract-version
+      run: |
+        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        GROUP_ID=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)
+        ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "groupId=$GROUP_ID" >> $GITHUB_OUTPUT
+        echo "artifactId=$ARTIFACT_ID" >> $GITHUB_OUTPUT
+        echo "Extracted version: $VERSION, groupId: $GROUP_ID, artifactId: $ARTIFACT_ID"
+     
+    - uses: s4u/maven-settings-action@v2.6.0
+      with:
+        servers: |
+          [{
+              "id": "anypoint-exchange-v3",
+              "username": "${{ secrets.ANYPOINT_USERNAME }}",
+              "password": "${{ secrets.ANYPOINT_PASSWORD }}"
+          },
+          {
+            "id": "exchange-repository",
+            "username": "${{ secrets.ANYPOINT_USERNAME }}",
+            "password": "${{ secrets.ANYPOINT_PASSWORD }}"
+          }
+          ]
+
+    # Check if artifact already exists in Exchange
+    - name: Check if artifact exists in Exchange
+      id: check-artifact
+      continue-on-error: true
+      run: |
+        # Method 1: Try to download the artifact to check if it exists
+        if mvn dependency:get \
+          -DgroupId=${{ steps.extract-version.outputs.groupId }} \
+          -DartifactId=${{ steps.extract-version.outputs.artifactId }} \
+          -Dversion=${{ steps.extract-version.outputs.version }} \
+          -Dpackaging=jar \
+          -DremoteRepositories=https://maven.anypoint.mulesoft.com/api/v3/maven \
+          -Dtransitive=false \
+          -Ddest=/tmp/test.jar 2>/dev/null; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "Artifact already exists in Exchange, skipping upload"
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "Artifact does not exist in Exchange, proceeding with upload"
+        fi
+            
+    - name: Publish artifact to Exchange
+      if: steps.check-artifact.outputs.exists == 'false'
+      run: |
+        echo "Publishing artifact to Exchange..."
+        mvn -B clean deploy --file pom.xml
         
+    - name: Skip Exchange upload
+      if: steps.check-artifact.outputs.exists == 'true'
+      run: |
+        echo "Artifact version ${{ steps.extract-version.outputs.version }} already exists in Exchange. Skipping upload."
+
+# Steps for executing the deployment against Cloudhub2.0 Anypoint Platform
+  deploy:
+    needs: exchange
+    runs-on: ubuntu-latest
+    steps:    
+    - uses: actions/checkout@v3
+    - uses: actions/cache@v3
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+          
+    - uses: s4u/maven-settings-action@v2.6.0
+      with:
+        servers: |
+          [{
+              "id": "anypoint-exchange-v3",
+              "username": "${{ secrets.ANYPOINT_USERNAME }}",
+              "password": "${{ secrets.ANYPOINT_PASSWORD }}"
+          },
+          {
+              "id": "cloudhub-deploy",
+              "username": "${{ secrets.ANYPOINT_USERNAME }}",
+              "password": "${{ secrets.ANYPOINT_PASSWORD }}"
+          },
+          {
+            "id": "exchange-repository",
+            "username": "${{ secrets.ANYPOINT_USERNAME }}",
+            "password": "${{ secrets.ANYPOINT_PASSWORD }}"
+          }
+          ]
+    - name: Deploy to CloudHub 2
+      run: |
+        mvn clean deploy --file pom.xml -DmuleDeploy
+
   # This workflow contains a single job called "build"
   testing:
     if: ${{ false }}
